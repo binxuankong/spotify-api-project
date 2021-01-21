@@ -32,8 +32,8 @@ WHERE tg.user_id = %(user_id)s
 
 music_features_query = """
 SELECT *
-FROM "MusicFeatures" mf
-WHERE mf.user_id = %(user_id)s
+FROM "TopFeatures" tf
+WHERE tf.user_id = %(user_id)s
 """
 
 user_update_query = """
@@ -83,6 +83,15 @@ FROM "TempTracks" tt
 ON CONFLICT (track_id) DO NOTHING
 """
 
+features_insert_query = """
+INSERT INTO "MusicFeatures" (track_id, danceability, energy, loudness, speechiness, acousticness, instrumentalness,
+    liveness, valence, tempo, key, mode, duration_ms, time_signature)
+SELECT tf.track_id, tf.danceability, tf.energy, tf.loudness, tf.speechiness, tf.acousticness, tf.instrumentalness,
+    tf.liveness, tf.valence, tf.tempo, tf.key, tf.mode, tf.duration_ms, tf.time_signature
+FROM "TempFeatures" tf
+ON CONFLICT (track_id) DO NOTHING
+"""
+
 users2_query = """
 SELECT u.user_id, u.display_name, u.spotify_url, u.image_url
 FROM "Users" u
@@ -113,12 +122,12 @@ WHERE tg.user_id in %(user_ids)s
 
 music_features2_query = """
 SELECT *
-FROM "MusicFeatures" mf
-WHERE mf.user_id in %(user_ids)s
+FROM "TopFeatures" tf
+WHERE tf.user_id in %(user_ids)s
 """
 
 similar_artists_query = """
-SELECT artist_id, artist, artist_url, artist_image
+SELECT artist_id, artist, genres, artist_url, artist_image
 FROM "Artists"
 WHERE artist_id in %(artist_ids)s
 """
@@ -202,4 +211,18 @@ ORDER BY tt.point desc
 new_of_day_query = """
 INSERT INTO "DailyMix" (artist_id, track_id, lyrics_id, date_created)
 VALUES (%(artist_id)s, %(track_id)s, %(lyrics_id)s, %(date_created)s)
+"""
+
+similar_users_query = """
+SELECT ta2.user_id, u.display_name, u.image_url,
+SUM(100 - greatest(ta1.rank, ta2.rank) - abs(ta1.rank - ta2.rank)) AS point
+FROM "TopArtists" ta1
+LEFT JOIN "TopArtists" ta2
+ON ta1.artist_id = ta2.artist_id AND ta1.user_id <> ta2.user_id
+JOIN "Users" u
+ON ta2.user_id = u.user_id
+WHERE ta1.user_id = %(user_id)s
+GROUP BY ta2.user_id, u.display_name, u.image_url
+ORDER BY point desc
+LIMIT 10
 """
